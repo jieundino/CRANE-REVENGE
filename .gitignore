@@ -1,0 +1,49 @@
+# Python 캐시 및 바이트코드
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 가상환경 (uv 등)
+.venv/
+venv/
+ENV/
+env/
+
+# 환경 변수 및 비밀키/인증서 (주의: .env.example은 커밋 대상)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+id_rsa
+id_rsa.*
+
+# SQLite 데이터베이스 파일 (주의: data/.gitkeep은 유지)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/*
+!data/.gitkeep
+
+# 테스트 및 도구 캐시
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# OS 및 에디터 설정 파일
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 로그 파일
+*.log
+logs/
