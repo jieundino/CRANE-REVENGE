@@ -31,6 +31,8 @@
 | 데이터 검증 | Pydantic | UUID, 닉네임, 클리어 시간 유효 범위 검증 |
 | 데이터베이스 | SQLite (`sqlite3`) | `players`, `game_records` 영속 저장 |
 | 서버 / 통신 | Uvicorn / HTTPX | FastAPI ASGI 서버 실행 및 Streamlit ↔ FastAPI HTTP 통신 |
+| 1차 배포 | Azure Linux VM (Ubuntu 24.04) | IaaS 서버 환경 직접 구성 및 배포 (완료) |
+| 2차 배포 | Azure App Service (Linux) | PaaS 관리형 웹앱 호스팅 배포 (STEP 9~10 진행 예정) |
 
 ---
 
@@ -119,16 +121,60 @@ uv run python -m unittest discover -s tests -v
 
 ---
 
-## 5. GitHub Repository 및 배포 절차 (STEP 8 ~ STEP 11 진행 예정)
+## 5. GitHub Repository 및 클라우드 배포 절차
 
 - **GitHub Repository**: `https://github.com/jieundino/CRANE-REVENGE.git`
-- **Azure Linux VM 배포 (STEP 8)**: 진행 예정 (미검증)
-- **Azure App Service 배포 적합성 확인 및 배포 (STEP 9 ~ 10)**: 진행 예정 (미검증)
-- **두 배포 방식 비교표 (STEP 11)**: 실제 배포 실습 완료 후 작성 예정
+
+### 5-1. 1차 배포: Azure Linux VM 배포 절차 (STEP 8 완료)
+
+1. **VM 사양 및 환경**:
+   - OS: Ubuntu 24.04 LTS (`Linux edu 7.0.0-1017-azure x86_64`)
+   - 기본 Python 버전: `Python 3.12.3`
+   - 패키지 관리: `uv 0.13.7` (`/home/azureuser/.local/bin/uv`)
+2. **SSH 접속 및 저장소 Clone / 의존성 설치**:
+   ```bash
+   # [Azure Linux VM]
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   git clone https://github.com/jieundino/CRANE-REVENGE.git ~/CRANE-REVENGE
+   cd ~/CRANE-REVENGE
+   ~/.local/bin/uv sync
+   ~/.local/bin/uv run python -m unittest discover -s tests -v
+   ```
+3. **서버 프로세스 기동**:
+   - FastAPI 백엔드 (VM 내부 루프백 전용):
+     ```bash
+     ~/.local/bin/uv run uvicorn backend.main:app --host 127.0.0.1 --port 8000
+     ```
+   - Streamlit 프론트엔드 (외부 접속용):
+     ```bash
+     ~/.local/bin/uv run streamlit run frontend/app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+     ```
+4. **네트워크 보안 그룹(NSG) 및 접속 확인**:
+   - Azure NSG 인바운드 규칙에 TCP `8501` 포트 허용 추가 (FastAPI `8000`번 포트는 외부에 비공개하여 VM 내부에서만 접근하도록 격리)
+   - 외부 접속 확인 주소: `http://20.41.121.123:8501` (정상 작동 및 헬스체크 `200 OK` 검증 완료)
+
+### 5-2. 2차 배포: Azure App Service 배포 절차 (STEP 9 ~ 10 진행 예정 / 미검증)
+
+- STEP 9(배포 적합성 사전 확인) 및 STEP 10(App Service 배포) 수행 후 실제 설정과 결과를 기록할 예정입니다.
 
 ---
 
-## 6. 알려진 제한사항 및 참고 사항
+## 6. 두 배포 방식 비교 (STEP 8 실측 기록 완료 / App Service는 STEP 10 후 완성 예정)
+
+| 비교 항목 | Azure VM (1차 배포 — 검증 완료) | Azure App Service (2차 배포 — 진행 예정/미검증) |
+|---|---|---|
+| **서비스 유형** | **IaaS** (Infrastructure as a Service) | **PaaS** (Platform as a Service) |
+| **서버 OS 관리** | Ubuntu 24.04 LTS 가상 머신을 직접 생성·관리 (`apt`, 패키지, 보안 패치 직접 수행) | 플랫폼이 OS 및 기본 인프라를 관리 (예정) |
+| **Python 환경 구성** | VM 내 시스템 `Python 3.12.3` 확인 후 `curl`로 `uv 0.13.7`을 직접 설치하고 `uv sync`로 `.venv` 구성 | Azure Portal에서 Python 런타임 선택 및 빌드/시작 스크립트 구성 (예정) |
+| **코드 배포** | SSH(또는 VS Code Remote-SSH) 접속 후 `git clone https://github.com/jieundino/CRANE-REVENGE.git` 수행 | GitHub Actions 연동 또는 VS Code Azure App Service 확장 배포 (예정) |
+| **외부 접속 및 네트워크** | 공용 IP 및 포트(`http://20.41.121.123:8501`) 사용, Azure NSG에서 인바운드 `8501`번 포트 직접 개방 (FastAPI `8000`번은 내부 `127.0.0.1`로만 제한) | 기본 제공 HTTPS 도메인(`*.azurewebsites.net`) 및 단일 외부 진입 포트 사용 (예정) |
+| **프로세스 관리** | SSH 터미널 또는 `systemd`(`crane-backend`, `crane-frontend`)로 두 프로세스(Uvicorn `8000`, Streamlit `8501`)를 직접 기동·관리 | 플랫폼 시작 명령(Startup Command / 시작 스크립트)으로 컨테이너 실행 모델에 맞춤 (예정) |
+| **파일 및 SQLite 저장** | VM 로컬 디스크(`/home/azureuser/CRANE-REVENGE/data/crane_revenge.db`)에 직접 영속 저장됨 | App Service 파일 시스템 특성 확인 후 영속 경로(`/home/...`) 설정 필요 (STEP 9~10 검증 예정) |
+| **운영 관리 특징** | 포트·방화벽·프로세스 구성을 세밀하게 제어할 수 있으나 OS/보안/프로세스 모니터링을 직접 챙겨야 함 | 인프라 관리 부담은 적으나 단일 포트/컨테이너 제약에 맞춘 구성이 필요함 (STEP 9~10 검증 예정) |
+
+---
+
+## 7. 알려진 제한사항 및 참고 사항
 
 - 별도 로그인 없이 브라우저별 UUID(`?player_id=...`)로 플레이어를 식별합니다. URL을 타인과 공유하면 동일 플레이어 ID를 공유하게 될 수 있으며, 브라우저 데이터 삭제·시크릿 모드·다른 기기 접속 시 새 플레이어로 취급됩니다.
 - 클라이언트에서 측정해 제출한 클리어 시간은 변조 가능성이 있으므로 본 프로젝트의 랭킹은 클라우드 배포 실습 및 학습용 기록으로 취급합니다.
